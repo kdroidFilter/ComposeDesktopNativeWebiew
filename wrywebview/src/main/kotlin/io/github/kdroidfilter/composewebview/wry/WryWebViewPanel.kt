@@ -19,6 +19,8 @@ class WryWebViewPanel(initialUrl: String) : JPanel() {
     private var windowsTimer: Timer? = null
     private var skikoInitialized: Boolean = false
     private var lastBounds: Bounds? = null
+    private var pendingBounds: Bounds? = null
+    private var boundsTimer: Timer? = null
 
     init {
         layout = BorderLayout()
@@ -107,6 +109,7 @@ class WryWebViewPanel(initialUrl: String) : JPanel() {
     private fun destroyIfNeeded() {
         stopGtkPump()
         stopWindowsPump()
+        stopBoundsTimer()
         webviewId?.let {
             log("destroy id=$it")
             NativeBindings.destroyWebview(it)
@@ -118,19 +121,36 @@ class WryWebViewPanel(initialUrl: String) : JPanel() {
     }
 
     private fun updateBounds() {
-        webviewId?.let {
-            val bounds = boundsInParent()
-            if (bounds == lastBounds) return
-            lastBounds = bounds
-            log("setBounds id=$it pos=(${bounds.x}, ${bounds.y}) size=${bounds.width}x${bounds.height}")
-            NativeBindings.setBounds(it, bounds.x, bounds.y, bounds.width, bounds.height)
+        val id = webviewId ?: return
+        val bounds = boundsInParent()
+        if (IS_LINUX) {
+            pendingBounds = bounds
+            if (boundsTimer == null) {
+                boundsTimer = Timer(16) {
+                    val currentId = webviewId ?: return@Timer
+                    val toSend = pendingBounds ?: return@Timer
+                    pendingBounds = null
+                    if (toSend != lastBounds) {
+                        lastBounds = toSend
+                        log("setBounds id=$currentId pos=(${toSend.x}, ${toSend.y}) size=${toSend.width}x${toSend.height}")
+                        NativeBindings.setBounds(currentId, toSend.x, toSend.y, toSend.width, toSend.height)
+                    }
+                    if (pendingBounds == null) {
+                        stopBoundsTimer()
+                    }
+                }.apply { start() }
+            }
+            return
         }
+        if (bounds == lastBounds) return
+        lastBounds = bounds
+        log("setBounds id=$id pos=(${bounds.x}, ${bounds.y}) size=${bounds.width}x${bounds.height}")
+        NativeBindings.setBounds(id, bounds.x, bounds.y, bounds.width, bounds.height)
     }
 
     private fun startGtkPumpIfNeeded() {
         if (!IS_LINUX || gtkTimer != null) return
-        log("startGtkPump")
-        gtkTimer = Timer(16) { NativeBindings.pumpGtkEvents() }.apply { start() }
+        log("startGtkPump (noop, handled in native GTK thread)")
     }
 
     private fun stopGtkPump() {
@@ -163,6 +183,12 @@ class WryWebViewPanel(initialUrl: String) : JPanel() {
     private fun stopCreateTimer() {
         createTimer?.stop()
         createTimer = null
+    }
+
+    private fun stopBoundsTimer() {
+        boundsTimer?.stop()
+        boundsTimer = null
+        pendingBounds = null
     }
 
     private fun componentHandle(component: Component): ULong {

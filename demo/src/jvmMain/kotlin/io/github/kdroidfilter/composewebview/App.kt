@@ -11,7 +11,7 @@ import androidx.compose.ui.tooling.preview.Preview
 fun App() {
     MaterialTheme {
         WryWebView(
-            url = "https://netfree.link",
+            url = "https://jetbrains.com/",
             modifier = Modifier.fillMaxSize(),
         )
 

@@ -23,7 +23,7 @@ import io.github.kdroidfilter.composewebview.WryWebView
 @Composable
 fun App() {
     WryWebView(
-        url = "https://netfree.link",
+        url = "https://sample.com",
         modifier = Modifier.fillMaxSize(),
     )
 }

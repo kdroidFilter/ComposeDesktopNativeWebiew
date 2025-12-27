@@ -8,6 +8,10 @@ use wry::raw_window_handle::{HandleError, HasWindowHandle, RawWindowHandle, Wind
 use wry::{Rect, WebView, WebViewBuilder};
 
 #[cfg(target_os = "linux")]
+use std::sync::mpsc;
+#[cfg(target_os = "linux")]
+use std::time::Duration;
+#[cfg(target_os = "linux")]
 use std::os::raw::c_ulong;
 #[cfg(target_os = "linux")]
 use wry::raw_window_handle::XlibWindowHandle;
@@ -84,6 +88,73 @@ static WEBVIEWS: OnceLock<Mutex<HashMap<u64, WebViewEntry>>> = OnceLock::new();
 
 fn webviews() -> &'static Mutex<HashMap<u64, WebViewEntry>> {
     WEBVIEWS.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+#[cfg(target_os = "linux")]
+type GtkTask = Box<dyn FnOnce() + Send + 'static>;
+
+#[cfg(target_os = "linux")]
+struct GtkRunner {
+    sender: mpsc::Sender<GtkTask>,
+    init_error: Option<String>,
+}
+
+#[cfg(target_os = "linux")]
+static GTK_RUNNER: OnceLock<GtkRunner> = OnceLock::new();
+
+#[cfg(target_os = "linux")]
+fn gtk_runner() -> Result<&'static GtkRunner, WebViewError> {
+    let runner = GTK_RUNNER.get_or_init(|| {
+        let (task_tx, task_rx) = mpsc::channel::<GtkTask>();
+        let (init_tx, init_rx) = mpsc::sync_channel::<Result<(), String>>(1);
+        std::thread::spawn(move || {
+            let init_result = gtk::init().map_err(|err| err.to_string());
+            let _ = init_tx.send(init_result.clone());
+            if init_result.is_err() {
+                return;
+            }
+            loop {
+                while let Ok(task) = task_rx.try_recv() {
+                    task();
+                }
+                while gtk::events_pending() {
+                    gtk::main_iteration_do(false);
+                }
+                std::thread::sleep(Duration::from_millis(8));
+            }
+        });
+        let init_result = init_rx
+            .recv()
+            .unwrap_or_else(|_| Err("gtk init thread failed".to_string()));
+        GtkRunner {
+            sender: task_tx,
+            init_error: init_result.err(),
+        }
+    });
+    if let Some(err) = runner.init_error.as_ref() {
+        return Err(WebViewError::GtkInit(err.clone()));
+    }
+    Ok(runner)
+}
+
+#[cfg(target_os = "linux")]
+fn run_on_gtk_thread<F, R>(f: F) -> Result<R, WebViewError>
+where
+    F: FnOnce() -> Result<R, WebViewError> + Send + 'static,
+    R: Send + 'static,
+{
+    let runner = gtk_runner()?;
+    let (result_tx, result_rx) = mpsc::sync_channel(1);
+    runner
+        .sender
+        .send(Box::new(move || {
+            let result = f();
+            let _ = result_tx.send(result);
+        }))
+        .map_err(|_| WebViewError::Internal("gtk runner stopped".to_string()))?;
+    result_rx
+        .recv()
+        .map_err(|_| WebViewError::Internal("gtk runner stopped".to_string()))?
 }
 
 fn with_webview<F, R>(id: u64, f: F) -> Result<R, WebViewError>
@@ -254,6 +325,10 @@ pub fn create_webview(
     height: i32,
     url: String,
 ) -> Result<u64, WebViewError> {
+    #[cfg(target_os = "linux")]
+    {
+        return run_on_gtk_thread(move || create_webview_inner(parent_handle, width, height, url));
+    }
     run_on_main_thread(move || create_webview_inner(parent_handle, width, height, url))
 }
 
@@ -291,7 +366,12 @@ pub fn set_bounds(
         return Ok(());
     }
 
-    #[cfg(not(target_os = "macos"))]
+    #[cfg(target_os = "linux")]
+    {
+        return run_on_gtk_thread(move || set_bounds_inner(id, x, y, width, height));
+    }
+
+    #[cfg(target_os = "windows")]
     {
         run_on_main_thread(move || set_bounds_inner(id, x, y, width, height))
     }
@@ -304,6 +384,10 @@ fn load_url_inner(id: u64, url: String) -> Result<(), WebViewError> {
 
 #[uniffi::export]
 pub fn load_url(id: u64, url: String) -> Result<(), WebViewError> {
+    #[cfg(target_os = "linux")]
+    {
+        return run_on_gtk_thread(move || load_url_inner(id, url));
+    }
     run_on_main_thread(move || load_url_inner(id, url))
 }
 
@@ -334,6 +418,10 @@ fn destroy_webview_inner(id: u64) -> Result<(), WebViewError> {
 
 #[uniffi::export]
 pub fn destroy_webview(id: u64) -> Result<(), WebViewError> {
+    #[cfg(target_os = "linux")]
+    {
+        return run_on_gtk_thread(move || destroy_webview_inner(id));
+    }
     run_on_main_thread(move || destroy_webview_inner(id))
 }
 
@@ -341,9 +429,7 @@ pub fn destroy_webview(id: u64) -> Result<(), WebViewError> {
 pub fn pump_gtk_events() {
     #[cfg(target_os = "linux")]
     {
-        while gtk::events_pending() {
-            gtk::main_iteration_do(false);
-        }
+        // Events are pumped continuously on the dedicated GTK thread.
     }
 }
 

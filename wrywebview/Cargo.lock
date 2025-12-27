@@ -240,6 +240,7 @@ name = "composewebview-wry"
 version = "0.1.0"
 dependencies = [
  "dispatch2",
+ "glib",
  "gtk",
  "objc2",
  "thiserror 2.0.17",

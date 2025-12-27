@@ -11,7 +11,6 @@ kotlin {
         jvmMain.dependencies {
             implementation(compose.runtime)
             implementation(compose.ui)
-            implementation(compose.desktop.currentOs)
             api(project(":wrywebview"))
         }
     }
