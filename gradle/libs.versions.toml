@@ -1,17 +1,17 @@
 [versions]
-androidx-activity = "1.9.3"
+androidx-activity = "1.12.2"
 androidx-lifecycle = "2.9.6"
-androidGradlePlugin = "8.6.1"
+androidGradlePlugin = "8.12.3"
 composeHotReload = "1.0.0"
 composeMultiplatform = "1.10.0-rc02"
 gobley = "0.3.7"
-google-material = "1.12.0"
+google-material = "1.13.0"
 jna = "5.18.1"
 junit = "4.13.2"
 kotlin = "2.3.0"
 kotlinx-coroutines = "1.10.2"
-kotlinx-datetime = "0.6.1"
-kotlinx-serialization = "1.7.3"
+kotlinx-datetime = "0.7.1"
+kotlinx-serialization = "1.9.0"
 skiko = "0.9.37.3"
 
 [libraries]
