@@ -45,15 +45,27 @@ internal class DesktopWebView(
                 when (readType) {
                     WebViewFileReadType.ASSET_RESOURCES -> {
                         val normalized = fileName.removePrefix("/")
-                        val candidates =
-                            listOf(
-                                if (normalized.startsWith("assets/")) normalized else "assets/$normalized",
-                                if (normalized.startsWith("compose-resources/")) normalized else "compose-resources/files/$normalized",
-                                if (normalized.startsWith("compose-resources/")) normalized else "compose-resources/assets/$normalized",
-                            )
-                        val loader = this::class.java.classLoader
+                        val candidates = linkedSetOf<String>()
+                        if (
+                            normalized.startsWith("assets/") ||
+                            normalized.startsWith("compose-resources/") ||
+                            normalized.startsWith("composeResources/")
+                        ) {
+                            candidates.add(normalized)
+                        }
+                        candidates.add("assets/$normalized")
+                        candidates.add("compose-resources/files/$normalized")
+                        candidates.add("compose-resources/assets/$normalized")
+                        candidates.add("composeResources/files/$normalized")
+                        candidates.add("composeResources/assets/$normalized")
+                        val loaders = listOfNotNull(Thread.currentThread().contextClassLoader, this::class.java.classLoader)
                         candidates.asSequence()
-                            .mapNotNull { path -> loader.getResourceAsStream(path)?.use { it.readBytes().toString(Charsets.UTF_8) } }
+                            .mapNotNull { path ->
+                                loaders.asSequence()
+                                    .mapNotNull { loader -> loader.getResourceAsStream(path) }
+                                    .firstOrNull()
+                                    ?.use { it.readBytes().toString(Charsets.UTF_8) }
+                            }
                             .firstOrNull()
                             ?: error("Resource not found: ${candidates.joinToString()}")
                     }

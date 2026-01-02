@@ -31,14 +31,16 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import composewebview.demo_shared.generated.resources.Res
 import io.github.kdroidfilter.webview.cookie.Cookie
 import io.github.kdroidfilter.webview.util.KLogSeverity
-import io.github.kdroidfilter.webview.web.WebViewFileReadType
 import io.github.kdroidfilter.webview.web.WebViewNavigator
 import io.github.kdroidfilter.webview.web.WebViewState
+import kotlinx.coroutines.launch
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -84,6 +86,7 @@ internal fun DemoToolsPanel(
     logSeverity: KLogSeverity,
     onSetLogSeverity: (KLogSeverity) -> Unit,
 ) {
+    val scope = rememberCoroutineScope()
     Surface(modifier = modifier, color = MaterialTheme.colorScheme.surface) {
         Column(
             modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(12.dp),
@@ -121,7 +124,25 @@ internal fun DemoToolsPanel(
                     }
                     FilledTonalButton(
                         onClick = {
-                            navigator.loadHtmlFile("bridge_playground.html", WebViewFileReadType.ASSET_RESOURCES)
+                            scope.launch {
+                                val html =
+                                    runCatching {
+                                        Res.readBytes("files/bridge_playground.html").decodeToString()
+                                    }.getOrElse { error ->
+                                        """
+                                        <!DOCTYPE html>
+                                        <html>
+                                        <head><title>Error Loading Resource</title></head>
+                                        <body>
+                                          <h2>Error Loading Resource</h2>
+                                          <p>files/bridge_playground.html</p>
+                                          <pre>${error.stackTraceToString()}</pre>
+                                        </body>
+                                        </html>
+                                        """.trimIndent()
+                                    }
+                                navigator.loadHtml(html)
+                            }
                         },
                     ) {
                         Text("Load HTML (file + bridge)")

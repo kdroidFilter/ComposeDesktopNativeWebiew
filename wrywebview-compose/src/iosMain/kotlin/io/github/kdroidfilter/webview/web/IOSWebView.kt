@@ -97,10 +97,14 @@ internal class IOSWebView(
                     val candidates =
                         if (normalized.startsWith("compose-resources/") || normalized.startsWith("assets/")) {
                             listOf(normalized)
+                        } else if (normalized.startsWith("composeResources/")) {
+                            listOf(normalized)
                         } else {
                             listOf(
                                 "compose-resources/files/$normalized",
                                 "compose-resources/assets/$normalized",
+                                "composeResources/files/$normalized",
+                                "composeResources/assets/$normalized",
                                 "assets/$normalized",
                                 normalized,
                             )

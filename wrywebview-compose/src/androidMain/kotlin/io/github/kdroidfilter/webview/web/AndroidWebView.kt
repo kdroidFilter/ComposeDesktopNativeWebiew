@@ -38,16 +38,29 @@ internal class AndroidWebView(
     override suspend fun loadHtmlFile(fileName: String, readType: WebViewFileReadType) {
         KLogger.d(tag = "AndroidWebView") { "loadHtmlFile fileName=$fileName readType=$readType" }
         val normalized = fileName.removePrefix("/")
+        val assetPath = normalized.removePrefix("assets/")
         when (readType) {
             WebViewFileReadType.ASSET_RESOURCES -> {
-                // Prefer Compose Multiplatform resources location, fall back to regular android_asset.
-                val composeFiles = "file:///android_asset/compose-resources/files/$normalized"
-                val composeAssets = "file:///android_asset/compose-resources/assets/$normalized"
-                val legacyAssets = "file:///android_asset/$normalized"
-                webView.loadUrl(composeFiles)
-                // If the asset doesn't exist, Android will show an error page; callers can opt to use COMPOSE_RESOURCE_FILES.
-                // Keeping behavior simple and aligned with upstream.
-                KLogger.d(tag = "AndroidWebView") { "loadUrl $composeFiles (fallbacks: $composeAssets, $legacyAssets)" }
+                val candidates =
+                    listOf(
+                        "compose-resources/files/$assetPath",
+                        "composeResources/files/$assetPath",
+                        "compose-resources/assets/$assetPath",
+                        "composeResources/assets/$assetPath",
+                        assetPath,
+                    )
+                val selected =
+                    candidates.firstOrNull { path ->
+                        try {
+                            webView.context.assets.open(path).close()
+                            true
+                        } catch (_: Exception) {
+                            false
+                        }
+                    } ?: candidates.first()
+                val url = "file:///android_asset/$selected"
+                webView.loadUrl(url)
+                KLogger.d(tag = "AndroidWebView") { "loadUrl $url (candidates: ${candidates.joinToString()})" }
             }
             WebViewFileReadType.COMPOSE_RESOURCE_FILES -> webView.loadUrl(fileName)
         }
