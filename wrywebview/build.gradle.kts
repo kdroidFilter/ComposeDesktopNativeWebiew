@@ -7,6 +7,7 @@ import gobley.gradle.cargo.tasks.CargoBuildTask
 import gobley.gradle.cargo.tasks.FindDynamicLibrariesTask
 import gobley.gradle.cargo.tasks.RustUpTargetAddTask
 import org.gradle.api.Project
+import org.gradle.language.jvm.tasks.ProcessResources
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.File
 
@@ -18,6 +19,17 @@ fun rustLibraryName(triple: String): String = when {
 
 fun Project.prebuiltRustLibrary(triple: String): File =
     layout.projectDirectory.dir("target/$triple/release").file(rustLibraryName(triple)).asFile
+
+data class NativeResource(val triple: String, val resourcePrefix: String)
+
+val nativeResources = listOf(
+    NativeResource("aarch64-apple-darwin", "darwin-aarch64"),
+    NativeResource("x86_64-apple-darwin", "darwin-x86-64"),
+    NativeResource("x86_64-unknown-linux-gnu", "linux-x86-64"),
+    NativeResource("aarch64-unknown-linux-gnu", "linux-aarch64"),
+    NativeResource("x86_64-pc-windows-msvc", "win32-x86-64"),
+    NativeResource("aarch64-pc-windows-msvc", "win32-aarch64"),
+)
 
 plugins {
     alias(libs.plugins.kotlinJvm)
@@ -70,6 +82,17 @@ dependencies {
 tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile>().configureEach {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
+tasks.named<ProcessResources>("processResources") {
+    nativeResources.forEach { (triple, resourcePrefix) ->
+        val prebuiltLib = project.prebuiltRustLibrary(triple)
+        if (prebuiltLib.exists()) {
+            from(prebuiltLib) {
+                into(resourcePrefix)
+            }
+        }
     }
 }
 
