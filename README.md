@@ -66,11 +66,9 @@ The demo UI is responsive: on large screens it shows a side “Tools” panel, a
 
 ### 1) Add dependency
 
-This repo is currently used as a multi-module Gradle project:
-
 ```kotlin
 dependencies {
-  implementation(project(":wrywebview-compose"))
+  implementation("io.github.kdroidfilter:composewebview:<version>")
 }
 ```
 
