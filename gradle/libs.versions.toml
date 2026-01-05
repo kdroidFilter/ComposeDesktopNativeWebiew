@@ -1,5 +1,6 @@
 [versions]
 androidx-activity = "1.12.2"
+mavenPublish = "0.35.0"
 androidx-lifecycle = "2.9.6"
 androidGradlePlugin = "8.12.3"
 composeHotReload = "1.0.0"
@@ -43,3 +44,4 @@ kotlinMultiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref =
 gobleyCargo = { id = "dev.gobley.cargo", version.ref = "gobley" }
 gobleyRust = { id = "dev.gobley.rust", version.ref = "gobley" }
 gobleyUniffi = { id = "dev.gobley.uniffi", version.ref = "gobley" }
+mavenPublish = { id = "com.vanniktech.maven.publish", version.ref = "mavenPublish" }

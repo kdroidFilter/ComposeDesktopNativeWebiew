@@ -39,7 +39,7 @@ kotlin {
             implementation(libs.kotlinx.coroutinesCore)
             implementation(libs.kotlinx.serializationJson)
 
-            implementation(project(":wrywebview-compose"))
+            implementation(project(":webview-compose"))
         }
 
         jvmMain.dependencies {

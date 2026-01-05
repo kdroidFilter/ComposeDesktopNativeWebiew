@@ -1,8 +1,11 @@
+import com.vanniktech.maven.publish.KotlinMultiplatform
+
 plugins {
     alias(libs.plugins.androidLibrary)
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
+    alias(libs.plugins.mavenPublish)
 }
 
 kotlin {
@@ -85,5 +88,18 @@ fun org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget.setUpiOSObserver()
         cinterops.create("observer") {
             compilerOpts("-F $path")
         }
+    }
+}
+
+mavenPublishing {
+    configure(KotlinMultiplatform(sourcesJar = true))
+    publishToMavenCentral()
+    if (project.findProperty("signingInMemoryKey") != null) {
+        signAllPublications()
+    }
+    coordinates(artifactId = "composewebview")
+    pom {
+        name.set("ComposeWebView")
+        description.set("Compose Multiplatform WebView library for Desktop, Android and iOS")
     }
 }

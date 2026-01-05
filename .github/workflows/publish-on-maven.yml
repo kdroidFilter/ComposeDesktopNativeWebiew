@@ -1,0 +1,153 @@
+name: Publish to Maven Central
+
+on:
+  push:
+    tags:
+      - "**"
+
+jobs:
+  build-rust-macos-aarch64:
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust library
+        working-directory: wrywebview
+        run: cargo build --release --target aarch64-apple-darwin
+
+      - name: Upload native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-darwin-aarch64
+          path: wrywebview/target/aarch64-apple-darwin/release/libcomposewebview_wry.dylib
+          retention-days: 1
+
+  build-rust-macos-x86_64:
+    runs-on: macos-13
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust library
+        working-directory: wrywebview
+        run: cargo build --release --target x86_64-apple-darwin
+
+      - name: Upload native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-darwin-x86_64
+          path: wrywebview/target/x86_64-apple-darwin/release/libcomposewebview_wry.dylib
+          retention-days: 1
+
+  build-rust-linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libxdo-dev
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust library
+        working-directory: wrywebview
+        run: cargo build --release --target x86_64-unknown-linux-gnu
+
+      - name: Upload native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-linux-x86_64
+          path: wrywebview/target/x86_64-unknown-linux-gnu/release/libcomposewebview_wry.so
+          retention-days: 1
+
+  build-rust-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build Rust library
+        working-directory: wrywebview
+        run: cargo build --release --target x86_64-pc-windows-msvc
+
+      - name: Upload native library
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-x86_64
+          path: wrywebview/target/x86_64-pc-windows-msvc/release/composewebview_wry.dll
+          retention-days: 1
+
+  publish:
+    needs:
+      - build-rust-macos-aarch64
+      - build-rust-macos-x86_64
+      - build-rust-linux
+      - build-rust-windows
+    runs-on: macos-14
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download macOS aarch64 native library
+        uses: actions/download-artifact@v4
+        with:
+          name: native-darwin-aarch64
+          path: wrywebview/target/aarch64-apple-darwin/release/
+
+      - name: Download macOS x86_64 native library
+        uses: actions/download-artifact@v4
+        with:
+          name: native-darwin-x86_64
+          path: wrywebview/target/x86_64-apple-darwin/release/
+
+      - name: Download Linux native library
+        uses: actions/download-artifact@v4
+        with:
+          name: native-linux-x86_64
+          path: wrywebview/target/x86_64-unknown-linux-gnu/release/
+
+      - name: Download Windows native library
+        uses: actions/download-artifact@v4
+        with:
+          name: native-windows-x86_64
+          path: wrywebview/target/x86_64-pc-windows-msvc/release/
+
+      - name: Verify native libraries
+        run: |
+          echo "=== Native libraries downloaded ==="
+          ls -la wrywebview/target/aarch64-apple-darwin/release/
+          ls -la wrywebview/target/x86_64-apple-darwin/release/
+          ls -la wrywebview/target/x86_64-unknown-linux-gnu/release/
+          ls -la wrywebview/target/x86_64-pc-windows-msvc/release/
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: "17"
+          distribution: "temurin"
+
+      - name: Setup Rust (for UniFFI bindgen)
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Publish to Maven Central
+        run: ./gradlew publishAndReleaseToMavenCentral --no-configuration-cache
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALPASSWORD }}
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNINGINMEMORYKEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNINGKEYID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNINGPASSWORD }}
