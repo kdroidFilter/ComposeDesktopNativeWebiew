@@ -74,8 +74,12 @@ internal class AndroidWebView(
 
     override fun stopLoading() = webView.stopLoading()
 
-    override fun evaluateJavaScript(script: String) {
-        webView.evaluateJavascript(script, null)
+    override fun evaluateJavaScript(script: String, callback: ((String) -> Unit)?) {
+        val androidScript = "javascript:$script"
+        KLogger.d {
+            "evaluateJavaScript: $androidScript"
+        }
+        webView.evaluateJavascript(androidScript, callback)
     }
 
     override fun injectJsBridge() {

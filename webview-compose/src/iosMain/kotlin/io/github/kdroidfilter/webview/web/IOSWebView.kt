@@ -188,8 +188,16 @@ internal class IOSWebView(
     }
 
     @OptIn(ExperimentalForeignApi::class)
-    override fun evaluateJavaScript(script: String) {
-        webView.evaluateJavaScript(script, completionHandler = null)
+    override fun evaluateJavaScript(script: String, callback: ((String) -> Unit)?) {
+        webView.evaluateJavaScript(script) { result, error ->
+            if (callback == null) return@evaluateJavaScript
+            if (error != null) {
+                KLogger.e { "evaluateJavaScript error: $error" }
+                callback.invoke(error.localizedDescription())
+            } else {
+                callback.invoke(result?.toString() ?: "")
+            }
+        }
     }
 
     override fun injectJsBridge() {

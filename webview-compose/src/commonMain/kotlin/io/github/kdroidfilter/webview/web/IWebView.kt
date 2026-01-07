@@ -47,6 +47,7 @@ interface IWebView {
 
     fun evaluateJavaScript(
         script: String,
+        callback: ((String) -> Unit)? = null
     )
 
     suspend fun loadContent(content: WebContent) {

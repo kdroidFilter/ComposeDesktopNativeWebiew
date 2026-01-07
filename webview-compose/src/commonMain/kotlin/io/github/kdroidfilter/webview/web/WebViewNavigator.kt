@@ -45,6 +45,7 @@ class WebViewNavigator(
 
         data class EvaluateJavaScript(
             val script: String,
+            val callback: ((String) -> Unit)? = null
         ) : NavigationEvent
     }
 
@@ -91,7 +92,7 @@ class WebViewNavigator(
                         )
 
                     is NavigationEvent.LoadHtmlFile -> loadHtmlFile(event.fileName, event.readType)
-                    is NavigationEvent.EvaluateJavaScript -> evaluateJavaScript(event.script)
+                    is NavigationEvent.EvaluateJavaScript -> evaluateJavaScript(event.script, event.callback)
                 }
             }
         }
@@ -134,8 +135,9 @@ class WebViewNavigator(
 
     fun evaluateJavaScript(
         script: String,
+        callback: ((String) -> Unit)? = null
     ) {
-        coroutineScope.launch { navigationEvents.emit(NavigationEvent.EvaluateJavaScript(script)) }
+        coroutineScope.launch { navigationEvents.emit(NavigationEvent.EvaluateJavaScript(script, callback)) }
     }
 
     fun navigateBack() {

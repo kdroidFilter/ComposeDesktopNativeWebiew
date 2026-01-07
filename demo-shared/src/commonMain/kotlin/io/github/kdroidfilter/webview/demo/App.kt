@@ -291,8 +291,10 @@ fun App() {
                                     jsSnippet = jsSnippet,
                                     onJsSnippetChange = { jsSnippet = it },
                                     onRunJs = {
-                                        navigator.evaluateJavaScript(jsSnippet)
                                         log("evaluateJavaScript bytes=${jsSnippet.length}")
+                                        navigator.evaluateJavaScript(jsSnippet) {
+                                            log("evaluateJavaScript result=$it")
+                                        }
                                     },
                                     onCallNativeFromJs = {
                                         val script =
@@ -399,8 +401,10 @@ fun App() {
                                     jsSnippet = jsSnippet,
                                     onJsSnippetChange = { jsSnippet = it },
                                     onRunJs = {
-                                        navigator.evaluateJavaScript(jsSnippet)
                                         log("evaluateJavaScript bytes=${jsSnippet.length}")
+                                        navigator.evaluateJavaScript(jsSnippet) {
+                                            log("evaluateJavaScript result=$it")
+                                        }
                                     },
                                     onCallNativeFromJs = {
                                         val script =

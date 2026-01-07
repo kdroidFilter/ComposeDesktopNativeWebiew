@@ -145,8 +145,6 @@ state.cookieManager.removeAllCookies()
 navigator.evaluateJavaScript("document.title = 'Hello'")
 ```
 
-Desktop is currently **fire-and-forget**.
-
 ---
 
 ### JS ↔ Kotlin bridge 🌉

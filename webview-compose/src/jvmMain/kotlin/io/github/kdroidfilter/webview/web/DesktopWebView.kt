@@ -99,10 +99,13 @@ internal class DesktopWebView(
 
     override fun stopLoading() = webView.stopLoading()
 
-    override fun evaluateJavaScript(
-        script: String,
-    ) {
-        webView.evaluateJavaScript(script)
+    override fun evaluateJavaScript(script: String, callback: ((String) -> Unit)?) {
+        KLogger.d {
+            "evaluateJavaScript: $script"
+        }
+        webView.evaluateJavaScript(script) { result ->
+            callback?.invoke(result)
+        }
     }
 
     override fun injectJsBridge() {

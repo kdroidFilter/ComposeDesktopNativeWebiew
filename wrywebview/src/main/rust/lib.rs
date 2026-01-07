@@ -478,24 +478,37 @@ pub fn stop_loading(id: u64) -> Result<(), WebViewError> {
     run_on_main_thread(move || stop_loading_inner(id))
 }
 
-fn evaluate_javascript_inner(id: u64, script: String) -> Result<(), WebViewError> {
-    eprintln!(
-        "[wrywebview] evaluate_javascript id={} bytes={}",
-        id,
-        script.len()
-    );
-    with_webview(id, |webview| webview.evaluate_script(&script).map_err(WebViewError::from))
+#[uniffi::export(callback_interface)]
+pub trait JavaScriptCallback: Send + Sync {
+    fn on_result(&self, result: String);
+}
+
+fn evaluate_javascript_inner(
+    id: u64,
+    script: String,
+    callback: Box<dyn JavaScriptCallback>,
+) -> Result<(), WebViewError> {
+    with_webview(id, |webview| {
+        let _ = webview.evaluate_script_with_callback(&script, move |result| {
+            callback.on_result(result);
+        });
+        Ok(())
+    })
 }
 
 #[uniffi::export]
-pub fn evaluate_javascript(id: u64, script: String) -> Result<(), WebViewError> {
+pub fn evaluate_javascript(
+    id: u64,
+    script: String,
+    callback: Box<dyn JavaScriptCallback>,
+) -> Result<(), WebViewError> {
     #[cfg(target_os = "linux")]
     {
-        return run_on_gtk_thread(move || evaluate_javascript_inner(id, script));
+        return run_on_gtk_thread(move || evaluate_javascript_inner(id, script, callback));
     }
 
     #[cfg(not(target_os = "linux"))]
-    run_on_main_thread(move || evaluate_javascript_inner(id, script))
+    run_on_main_thread(move || evaluate_javascript_inner(id, script, callback))
 }
 
 fn go_back_inner(id: u64) -> Result<(), WebViewError> {

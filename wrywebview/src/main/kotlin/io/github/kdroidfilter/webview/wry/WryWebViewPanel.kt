@@ -162,14 +162,22 @@ class WryWebViewPanel(
         log("stopLoading webviewId=$webviewId")
     }
 
-    fun evaluateJavaScript(script: String) {
-        val action = { webviewId?.let { NativeBindings.evaluateJavaScript(it, script) } }
-        if (SwingUtilities.isEventDispatchThread()) {
-            action()
-        } else {
-            SwingUtilities.invokeLater { action() }
+    fun evaluateJavaScript(script: String, callback: (String) -> Unit) {
+        val id = webviewId ?: run {
+            callback("")
+            return
         }
-        log("evaluateJavaScript bytes=${script.length} webviewId=$webviewId")
+        log("evaluateJavaScript bytes=${script.length} webviewId=$id")
+        try {
+            NativeBindings.evaluateJavaScript(id, script, object : JavaScriptCallback {
+                override fun onResult(result: String) {
+                    callback(result)
+                }
+            })
+        } catch (e: Exception) {
+            log("evaluateJavaScript failed: ${e.message}")
+            callback("")
+        }
     }
 
     fun getCurrentUrl(): String? {
@@ -690,8 +698,8 @@ private object NativeBindings {
         io.github.kdroidfilter.webview.wry.stopLoading(id)
     }
 
-    fun evaluateJavaScript(id: ULong, script: String) {
-        io.github.kdroidfilter.webview.wry.evaluateJavascript(id, script)
+    fun evaluateJavaScript(id: ULong, script: String, callback: JavaScriptCallback) {
+        io.github.kdroidfilter.webview.wry.evaluateJavascript(id, script, callback)
     }
 
     fun getUrl(id: ULong): String {
