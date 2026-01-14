@@ -5,12 +5,8 @@ package io.github.kdroidfilter.webview.util
  *
  * Keep logging simple and dependency-free across platforms.
  */
-internal object KLogger {
-    private var minSeverity: KLogSeverity = KLogSeverity.None
-
-    fun setMinSeverity(severity: KLogSeverity) {
-        minSeverity = severity
-    }
+interface KLogger {
+    fun setMinSeverity(severity: KLogSeverity)
 
     fun d(tag: String? = null, msg: () -> String) = log(KLogSeverity.Debug, tag, null, msg)
 
@@ -20,7 +16,46 @@ internal object KLogger {
 
     fun e(t: Throwable? = null, tag: String? = null, msg: () -> String) = log(KLogSeverity.Error, tag, t, msg)
 
-    private fun log(severity: KLogSeverity, tag: String?, t: Throwable?, msg: () -> String) {
+    fun log(severity: KLogSeverity, tag: String?, t: Throwable?, msg: () -> String)
+
+
+    companion object : KLogger {
+        private val loggers = mutableListOf<KLogger>(DefaultKLogger)
+
+        fun addLogger(logger: KLogger) {
+            loggers.add(logger)
+        }
+
+        fun removeLogger(logger: KLogger) {
+            loggers.remove(logger)
+        }
+
+        override fun setMinSeverity(severity: KLogSeverity) {
+            for (i in loggers) {
+                i.setMinSeverity(severity)
+            }
+        }
+
+        override fun log(
+            severity: KLogSeverity,
+            tag: String?,
+            t: Throwable?,
+            msg: () -> String
+        ) = loggers.forEach {
+            it.log(severity, tag, t, msg)
+        }
+
+    }
+}
+
+internal object DefaultKLogger : KLogger {
+    private var minSeverity: KLogSeverity = KLogSeverity.None
+
+    override fun setMinSeverity(severity: KLogSeverity) {
+        minSeverity = severity
+    }
+
+    override fun log(severity: KLogSeverity, tag: String?, t: Throwable?, msg: () -> String) {
         if (severity.ordinal < minSeverity.ordinal) return
         val prefix = buildString {
             append("[ComposeWebView]")
