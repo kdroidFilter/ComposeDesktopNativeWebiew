@@ -120,6 +120,16 @@ actual fun ActualWebView(
             }
         }
 
+        DisposableEffect(nativeWebView) {
+            val listener: (String) -> Boolean = {
+                true
+            }
+            nativeWebView.addNavigateListener(listener)
+            onDispose {
+                nativeWebView.removeNavigateListener(listener)
+            }
+        }
+
         SwingPanel(
             modifier = modifier,
             factory = {

@@ -34,6 +34,12 @@ class WryWebViewPanel(
     private var pendingBounds: Bounds? = null
     private var boundsTimer: Timer? = null
 
+    private val handlers = mutableListOf<(String) -> Boolean>()
+
+    private val handler = object : NavigationHandler {
+        override fun handleNavigation(url: String): Boolean = handlers.any { it(url) }
+    }
+
     init {
         layout = BorderLayout()
         add(host, BorderLayout.CENTER)
@@ -69,6 +75,14 @@ class WryWebViewPanel(
         log("doLayout size=${host.width}x${host.height} displayable=${host.isDisplayable} showing=${host.isShowing}")
         updateBounds()
         scheduleCreateIfNeeded()
+    }
+
+    fun addNavigateListener(data: (String) -> Boolean) {
+        handlers.add(data)
+    }
+
+    fun removeNavigateListener(data: (String) -> Boolean) {
+        handlers.remove(data)
     }
 
     fun loadUrl(url: String) {
@@ -332,9 +346,16 @@ class WryWebViewPanel(
             return try {
                 webviewId =
                     if (userAgent == null) {
-                        NativeBindings.createWebview(handleSnapshot, width, height, initialUrl)
+                        NativeBindings.createWebview(handleSnapshot, width, height, initialUrl, handler)
                     } else {
-                        NativeBindings.createWebviewWithUserAgent(handleSnapshot, width, height, initialUrl, userAgent)
+                        NativeBindings.createWebviewWithUserAgent(
+                            handleSnapshot,
+                            width,
+                            height,
+                            initialUrl,
+                            userAgent,
+                            handler
+                        )
                     }
                 updateBounds()
                 startGtkPumpIfNeeded()
@@ -350,6 +371,7 @@ class WryWebViewPanel(
                             pendingHtml = null
                             NativeBindings.loadHtml(id, html)
                         }
+
                         urlWithHeaders != null && headers.isNotEmpty() -> {
                             pendingUrlWithHeaders = null
                             pendingHeaders = emptyMap()
@@ -370,9 +392,16 @@ class WryWebViewPanel(
         thread(name = "wry-webview-create", isDaemon = true) {
             val createdId = try {
                 if (userAgent == null) {
-                    NativeBindings.createWebview(handleSnapshot, width, height, initialUrl)
+                    NativeBindings.createWebview(handleSnapshot, width, height, initialUrl, handler)
                 } else {
-                    NativeBindings.createWebviewWithUserAgent(handleSnapshot, width, height, initialUrl, userAgent)
+                    NativeBindings.createWebviewWithUserAgent(
+                        handleSnapshot,
+                        width,
+                        height,
+                        initialUrl,
+                        userAgent,
+                        handler
+                    )
                 }
             } catch (e: RuntimeException) {
                 System.err.println("Failed to create Wry webview: ${e.message}")
@@ -406,11 +435,13 @@ class WryWebViewPanel(
                         pendingHtml = null
                         NativeBindings.loadHtml(createdId, html)
                     }
+
                     urlWithHeaders != null && headers.isNotEmpty() -> {
                         pendingUrlWithHeaders = null
                         pendingHeaders = emptyMap()
                         NativeBindings.loadUrlWithHeaders(createdId, urlWithHeaders, headers)
                     }
+
                     pendingUrl != initialUrl -> {
                         NativeBindings.loadUrl(createdId, pendingUrl)
                     }
@@ -557,7 +588,13 @@ class WryWebViewPanel(
             }
         } else if (IS_MAC) {
             if (contentHandle != 0L && contentHandle != windowHandle) {
-                log("resolveParentHandle skiko content=0x${contentHandle.toString(16)} window=0x${windowHandle.toString(16)} (macOS content)")
+                log(
+                    "resolveParentHandle skiko content=0x${contentHandle.toString(16)} window=0x${
+                        windowHandle.toString(
+                            16
+                        )
+                    } (macOS content)"
+                )
                 return ParentHandle(contentHandle.toULong(), false)
             }
             if (windowHandle != 0L) {
@@ -570,7 +607,13 @@ class WryWebViewPanel(
             }
         } else {
             if (contentHandle != 0L) {
-                log("resolveParentHandle skiko content=0x${contentHandle.toString(16)} window=0x${windowHandle.toString(16)}")
+                log(
+                    "resolveParentHandle skiko content=0x${contentHandle.toString(16)} window=0x${
+                        windowHandle.toString(
+                            16
+                        )
+                    }"
+                )
                 return ParentHandle(contentHandle.toULong(), false)
             }
             if (windowHandle != 0L) {
@@ -642,8 +685,8 @@ class WryWebViewPanel(
 }
 
 private object NativeBindings {
-    fun createWebview(parentHandle: ULong, width: Int, height: Int, url: String): ULong {
-        return io.github.kdroidfilter.webview.wry.createWebview(parentHandle, width, height, url)
+    fun createWebview(parentHandle: ULong, width: Int, height: Int, url: String, handler: NavigationHandler): ULong {
+        return io.github.kdroidfilter.webview.wry.createWebview(parentHandle, width, height, url, handler)
     }
 
     fun createWebviewWithUserAgent(
@@ -652,6 +695,7 @@ private object NativeBindings {
         height: Int,
         url: String,
         userAgent: String,
+        handler: NavigationHandler,
     ): ULong {
         return io.github.kdroidfilter.webview.wry.createWebviewWithUserAgent(
             parentHandle,
@@ -659,6 +703,7 @@ private object NativeBindings {
             height,
             url,
             userAgent,
+            handler,
         )
     }
 
