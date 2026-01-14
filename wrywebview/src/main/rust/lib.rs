@@ -11,7 +11,6 @@ mod state;
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use std::sync::OnceLock;
 
 use wry::cookie::time::OffsetDateTime;
 use wry::cookie::{Cookie, Expiration, SameSite};
@@ -172,12 +171,19 @@ macro_rules! wry_log {
 // WebView Creation
 // ============================================================================
 
+#[uniffi::export(callback_interface)]
+pub trait NavigationHandler: Send + Sync {
+    /// Return true to allow navigation, false to cancel.
+    fn handle_navigation(&self, url: String) -> bool;
+}
+
 fn create_webview_inner(
     parent_handle: u64,
     width: i32,
     height: i32,
     url: String,
     user_agent: Option<String>,
+    nav_handler: Option<Box<dyn NavigationHandler>>,
 ) -> Result<u64, WebViewError> {
     let user_agent =
         user_agent.and_then(|ua| {
@@ -216,11 +222,16 @@ fn create_webview_inner(
 
     let webview = builder
         .with_navigation_handler(move |new_url| {
+            if let Some(handler) = &nav_handler {
+                return handler.handle_navigation(new_url.to_string());
+            }
+
             wry_log!("[wrywebview] navigation_handler url={}", new_url);
             state_for_nav.is_loading.store(true, Ordering::SeqCst);
             if let Err(e) = state_for_nav.update_current_url(new_url.clone()) {
                 wry_log!("[wrywebview] navigation_handler state update failed: {}", e);
             }
+
             true
         })
         .with_on_page_load_handler(move |event, url| {
@@ -315,16 +326,17 @@ pub fn create_webview(
     width: i32,
     height: i32,
     url: String,
+    nav_handler: Option<Box<dyn NavigationHandler>>
 ) -> Result<u64, WebViewError> {
     #[cfg(target_os = "linux")]
     {
         return run_on_gtk_thread(move || {
-            create_webview_inner(parent_handle, width, height, url, None)
+            create_webview_inner(parent_handle, width, height, url, None, nav_handler)
         });
     }
 
     #[cfg(not(target_os = "linux"))]
-    run_on_main_thread(move || create_webview_inner(parent_handle, width, height, url, None))
+    run_on_main_thread(move || create_webview_inner(parent_handle, width, height, url, None, nav_handler))
 }
 
 #[uniffi::export]
@@ -334,16 +346,17 @@ pub fn create_webview_with_user_agent(
     height: i32,
     url: String,
     user_agent: Option<String>,
+    nav_handler: Option<Box<dyn NavigationHandler>>
 ) -> Result<u64, WebViewError> {
     #[cfg(target_os = "linux")]
     {
         return run_on_gtk_thread(move || {
-            create_webview_inner(parent_handle, width, height, url, user_agent)
+            create_webview_inner(parent_handle, width, height, url, user_agent, nav_handler)
         });
     }
 
     #[cfg(not(target_os = "linux"))]
-    run_on_main_thread(move || create_webview_inner(parent_handle, width, height, url, user_agent))
+    run_on_main_thread(move || create_webview_inner(parent_handle, width, height, url, user_agent,nav_handler))
 }
 
 // ============================================================================

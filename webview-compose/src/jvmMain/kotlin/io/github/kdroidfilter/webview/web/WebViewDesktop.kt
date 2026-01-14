@@ -15,6 +15,8 @@ import androidx.compose.ui.awt.SwingPanel
 import io.github.kdroidfilter.webview.cookie.WryCookieManager
 import io.github.kdroidfilter.webview.jsbridge.WebViewJsBridge
 import io.github.kdroidfilter.webview.jsbridge.parseJsMessage
+import io.github.kdroidfilter.webview.request.WebRequest
+import io.github.kdroidfilter.webview.request.WebRequestInterceptResult
 import kotlinx.coroutines.delay
 
 actual class WebViewFactoryParam(
@@ -117,6 +119,41 @@ actual fun ActualWebView(
                 }
 
                 delay(250)
+            }
+        }
+
+        DisposableEffect(nativeWebView) {
+            val listener: (String) -> Boolean = a@{
+                if (navigator.requestInterceptor == null) {
+                    return@a true
+                }
+
+                val webRequest =
+                    WebRequest(
+                        url = it,
+                        headers = mutableMapOf(),
+                        isForMainFrame = true,
+                        isRedirect = true,
+                        method = "GET",
+                    )
+
+                return@a when (val interceptResult = navigator.requestInterceptor.onInterceptUrlRequest(webRequest, navigator)) {
+                    WebRequestInterceptResult.Allow -> true
+
+                    WebRequestInterceptResult.Reject -> false
+
+                    is WebRequestInterceptResult.Modify -> {
+                        interceptResult.request.let { modified ->
+                            navigator.stopLoading()
+                            navigator.loadUrl(modified.url, modified.headers)
+                        }
+                        false //no jump?
+                    }
+                }
+            }
+            nativeWebView.addNavigateListener(listener)
+            onDispose {
+                nativeWebView.removeNavigateListener(listener)
             }
         }
 
