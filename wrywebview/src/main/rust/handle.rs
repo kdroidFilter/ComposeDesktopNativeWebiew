@@ -84,7 +84,7 @@ pub fn raw_window_handle_from(parent_handle: u64) -> Result<RawWindowHandle, Web
         // if log_enabled() {
         //     eprintln!("[wrywebview] raw_window_handle Xlib=0x{:x}", parent_handle);
         // }
-        wry_log!("[wrywebview] raw_window_handle Xlib=0x{:x}", handle);
+        wry_log!("[wrywebview] raw_window_handle Xlib=0x{:x}", parent_handle);
         return Ok(handle);
     }
 
