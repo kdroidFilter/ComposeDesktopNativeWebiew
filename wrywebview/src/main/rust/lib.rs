@@ -10,7 +10,7 @@ mod state;
 
 use std::str::FromStr;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock, RwLock};
 
 use wry::cookie::time::OffsetDateTime;
 use wry::cookie::{Cookie, Expiration, SameSite};
@@ -159,12 +159,44 @@ pub fn set_log_enabled(enabled: bool) {
     LOG_ENABLED.store(enabled, Ordering::Relaxed);
 }
 
+#[uniffi::export(callback_interface)]
+pub trait NativeLogger: Send + Sync {
+    fn handle_log(&self, data: String);
+}
+
+static GLOBAL_LOGGER: OnceLock<RwLock<Option<Box<dyn NativeLogger>>>> = OnceLock::new();
+
+fn get_logger_registry() -> &'static RwLock<Option<Box<dyn NativeLogger>>> {
+    GLOBAL_LOGGER.get_or_init(|| RwLock::new(None))
+}
+
+#[uniffi::export]
+pub fn set_native_logger(logger: Box<dyn NativeLogger>) {
+    let mut lock = get_logger_registry().write().unwrap();
+    *lock = Some(logger);
+}
+
+#[macro_export]
 macro_rules! wry_log {
     ($($arg:tt)*) => {
-        if log_enabled() {
-            eprintln!($($arg)*);
-        }
+        $crate::do_internal_log(format_args!($($arg)*));
     };
+}
+
+#[doc(hidden)]
+pub fn do_internal_log(args: std::fmt::Arguments) {
+    if !log_enabled() {
+        return;
+    }
+    let log_string = args.to_string();
+
+    if let Ok(lock) = crate::get_logger_registry().read() {
+        if let Some(ref logger) = *lock {
+            logger.handle_log(log_string);
+            return;
+        }
+    }
+    eprintln!("{}", log_string);
 }
 
 // ============================================================================
@@ -364,12 +396,10 @@ pub fn create_webview_with_user_agent(
 // ============================================================================
 
 fn set_bounds_inner(id: u64, x: i32, y: i32, width: i32, height: i32) -> Result<(), WebViewError> {
-    if log_enabled() {
-        wry_log!(
-            "[wrywebview] set_bounds id={} pos=({}, {}) size={}x{}",
-            id, x, y, width, height
-        );
-    }
+    wry_log!(
+        "[wrywebview] set_bounds id={} pos=({}, {}) size={}x{}",
+        id, x, y, width, height
+    );
     let bounds = make_bounds(x, y, width, height);
     with_webview(id, |webview| webview.set_bounds(bounds).map_err(WebViewError::from))
 }

@@ -18,7 +18,7 @@ use std::num::NonZeroIsize;
 use wry::raw_window_handle::Win32WindowHandle;
 
 use crate::error::WebViewError;
-use crate::log_enabled;
+use crate::wry_log;
 
 /// Wrapper around a raw window handle for WebView creation.
 pub struct RawWindow {
@@ -49,12 +49,13 @@ pub fn raw_window_handle_from(parent_handle: u64) -> Result<RawWindowHandle, Web
 
     #[cfg(target_os = "windows")]
     {
-        let hwnd = NonZeroIsize::new(parent_handle as isize)
-            .ok_or(WebViewError::InvalidWindowHandle)?;
+        let hwnd =
+            NonZeroIsize::new(parent_handle as isize).ok_or(WebViewError::InvalidWindowHandle)?;
         let handle = RawWindowHandle::Win32(Win32WindowHandle::new(hwnd));
-        if log_enabled() {
-            eprintln!("[wrywebview] raw_window_handle Win32=0x{:x}", parent_handle);
-        }
+        wry_log!("[wrywebview] raw_window_handle Win32=0x{:x}", parent_handle);
+        // if log_enabled() {
+        //     eprintln!("[wrywebview] raw_window_handle Win32=0x{:x}", parent_handle);
+        // }
         return Ok(handle);
     }
 
@@ -62,22 +63,28 @@ pub fn raw_window_handle_from(parent_handle: u64) -> Result<RawWindowHandle, Web
     {
         let ns_view = crate::platform::macos::appkit_ns_view_from_handle(parent_handle)?;
         let handle = RawWindowHandle::AppKit(AppKitWindowHandle::new(ns_view));
-        if log_enabled() {
-            eprintln!(
-                "[wrywebview] raw_window_handle AppKit=0x{:x} ns_view=0x{:x}",
-                parent_handle,
-                ns_view.as_ptr() as usize
-            );
-        }
+        wry_log!(
+            "[wrywebview] raw_window_handle AppKit=0x{:x} ns_view=0x{:x}",
+            parent_handle,
+            ns_view.as_ptr() as usize
+        );
+        // if log_enabled() {
+        //     eprintln!(
+        //         "[wrywebview] raw_window_handle AppKit=0x{:x} ns_view=0x{:x}",
+        //         parent_handle,
+        //         ns_view.as_ptr() as usize
+        //     );
+        // }
         return Ok(handle);
     }
 
     #[cfg(target_os = "linux")]
     {
         let handle = RawWindowHandle::Xlib(XlibWindowHandle::new(parent_handle as c_ulong));
-        if log_enabled() {
-            eprintln!("[wrywebview] raw_window_handle Xlib=0x{:x}", parent_handle);
-        }
+        // if log_enabled() {
+        //     eprintln!("[wrywebview] raw_window_handle Xlib=0x{:x}", parent_handle);
+        // }
+        wry_log!("[wrywebview] raw_window_handle Xlib=0x{:x}", handle);
         return Ok(handle);
     }
 

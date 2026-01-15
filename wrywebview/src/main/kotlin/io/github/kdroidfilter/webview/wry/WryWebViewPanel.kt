@@ -685,6 +685,16 @@ class WryWebViewPanel(
 }
 
 private object NativeBindings {
+    init {
+        setNativeLogger(
+            object : NativeLogger {
+                override fun handleLog(data: String) {
+                    println(data)
+                }
+            }
+        )
+    }
+
     fun createWebview(parentHandle: ULong, width: Int, height: Int, url: String, handler: NavigationHandler): ULong {
         return io.github.kdroidfilter.webview.wry.createWebview(parentHandle, width, height, url, handler)
     }
