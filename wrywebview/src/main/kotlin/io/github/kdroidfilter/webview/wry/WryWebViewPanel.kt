@@ -9,11 +9,13 @@ import javax.swing.JPanel
 import javax.swing.SwingUtilities
 import javax.swing.Timer
 import kotlin.concurrent.thread
+import kotlin.properties.Delegates
 
 
 class WryWebViewPanel(
     initialUrl: String,
     customUserAgent: String? = null,
+    private val bridgeLogger: (String) -> Unit = { System.err.println(it) }
 ) : JPanel() {
     private val host = SkikoInterop.createHost()
     private var webviewId: ULong? = null
@@ -568,7 +570,7 @@ class WryWebViewPanel(
 
     private fun log(message: String) {
         if (LOG_ENABLED) {
-            System.err.println("[WryWebViewPanel] $message")
+            bridgeLogger("[WryWebViewPanel] $message")
         }
     }
 
@@ -665,12 +667,12 @@ class WryWebViewPanel(
     private data class ParentHandle(val handle: ULong, val isWindow: Boolean)
     private data class Bounds(val x: Int, val y: Int, val width: Int, val height: Int)
 
-    private companion object {
+    companion object {
         private val OS_NAME = System.getProperty("os.name")?.lowercase().orEmpty()
         private val IS_LINUX = OS_NAME.contains("linux")
         private val IS_MAC = OS_NAME.contains("mac")
         private val IS_WINDOWS = OS_NAME.contains("windows")
-        private val LOG_ENABLED = run {
+        var LOG_ENABLED = run {
             val raw = System.getProperty("composewebview.wry.log") ?: System.getenv("WRYWEBVIEW_LOG")
             when {
                 raw == null -> false
@@ -681,19 +683,24 @@ class WryWebViewPanel(
                 else -> false
             }
         }
+
+        val NATIVE_LOGGER: (String) -> Unit = { System.err.println(it) }
+
+        init {
+            setNativeLogger(
+                object : NativeLogger {
+                    override fun handleLog(data: String) {
+                        if (LOG_ENABLED) {
+                            NATIVE_LOGGER(data)
+                        }
+                    }
+                }
+            )
+        }
     }
 }
 
 private object NativeBindings {
-    init {
-        setNativeLogger(
-            object : NativeLogger {
-                override fun handleLog(data: String) {
-                    println(data)
-                }
-            }
-        )
-    }
 
     fun createWebview(parentHandle: ULong, width: Int, height: Int, url: String, handler: NavigationHandler): ULong {
         return io.github.kdroidfilter.webview.wry.createWebview(parentHandle, width, height, url, handler)
