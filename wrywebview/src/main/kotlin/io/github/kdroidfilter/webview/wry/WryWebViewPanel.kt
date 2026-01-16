@@ -684,7 +684,7 @@ class WryWebViewPanel(
             }
         }
 
-        val NATIVE_LOGGER: (String) -> Unit = { System.err.println(it) }
+        var NATIVE_LOGGER: (String) -> Unit = { System.err.println(it) }
 
         init {
             setNativeLogger(
